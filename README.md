@@ -135,6 +135,102 @@ The cap is a *symptom amplifier*. Breaking it at either end works, and the
 repo does both: reclaim swap, and keep apps out of the standby kill tier so
 they stop churning.
 
+## Every lever available, and what each one actually does
+
+Ordered by measured impact on this device.
+
+### 1. Keep apps out of the LMKD kill tier - `app_standby_enabled=0`
+
+Android demotes unused apps into a bucket the low-memory killer harvests
+first. Measured on a backgrounded app: `oom_score_adj` of **900+** (inside
+the kill zone). With this set it holds **0** (protected tier).
+
+*Effect:* apps survive in the background instead of being killed and
+reloaded. **19,385 kills -> 0.**
+*Cost:* none. Reverted at every boot by the vendor ROM, so it needs
+re-applying.
+
+### 2. Drain swap residency - `swap-drain.sh`
+
+The single biggest lever, and the one that fixes the CPU cap too.
+
+The kernel migrates cold pages out to zram and only brings them back via
+compaction. On this ROM compaction is unavailable (the
+`ActivityManagerConstants` observer is disabled - confirmed with a control
+test), so pages migrate out and **never return**. Swap sits at ~85% full
+permanently while RAM looks half-empty.
+
+A page fault served from zram costs **~100x a RAM access**, and the UI
+thread blocks on it. That is the `io_wait` term:
+
+```
+swap used    1278 MB (83.3%)  ->  915 MB (59.6%)
+MemAvailable  720 MB          ->  1006 MB
+SystemUI p90 frame time  21ms ->  16ms   (60Hz budget = 16.67ms)
+```
+
+*Cost:* the affected apps relaunch cold next time. The tool refuses to stop
+the IME, launcher, Play Store or GMS, since interrupting those costs more
+than it saves.
+
+### 3. Remove the vendor's second kill layer - 15 packages disabled
+
+vivo runs background-process supervisors *on top of* Android's LMKD.
+`com.vivo.sps` alone held 120 MB across two processes and ran at 54% CPU.
+Each was verified non-critical (no IME, launcher, dialer or biometric
+component).
+
+*Effect:* one kill system instead of two.
+
+### 4. AOT compile your apps - `aot-compile.sh`
+
+ART interprets code and JIT-compiles hot paths **while you are using the
+app**, so the first seconds of every launch go to compiling rather than
+drawing. AOT compilation moves that to a one-off step.
+
+*Effect:* faster cold starts, smoother execution, less CPU burned compiling
+during interaction. 28 packages moved to `status=speed`.
+*Cost:* disk space and a one-off compile. A full-device compile is ~325
+packages and takes several minutes; `installd` may restart and interrupt
+it, so it is resumable.
+
+### 5. Halve animation duration - animation scales `0.5`
+
+Animations are the most visible thing between a tap and a result.
+
+*Effect:* animations finish in half the wall-clock time. Perceived
+responsiveness improves; measured frame_time is unchanged. Zero regression
+risk.
+*Cost:* slightly less polished looking. `0.0` is instant if you want
+maximum responsiveness over aesthetics.
+
+### 6. Disable the app freezer - `cached_apps_freezer=disabled`
+
+Freezing cached apps is a RAM saver, but thawing one stalls the launcher.
+
+*Effect:* no freeze/thaw stall on resume.
+
+### 7. Doze whitelist - `cmd deviceidle whitelist +<pkg>`
+
+Keeps foreground apps out of deep idle.
+
+*Effect:* they are not frozen or killed during long idle periods.
+
+### 8. Uninstall unused packages - 19 removed
+
+*Effect:* 19 fewer processes and 4 GB less storage.
+
+### Levers that were tried and rejected
+
+| Attempt | Why it was rejected |
+|---|---|
+| `cmd game downscale` | Reduces GPU work, but upscaling to the panel makes text visibly larger and softer. On a 720p display users read that as "the font size changed". Only worth it when GPU-bound - which is not the case here (GPU p50 = 5 ms vs 16.67 ms budget). |
+| `cmd power set-fixed-performance-mode-enabled` | Measured **worse**: jank 60% -> 76%. Forcing max frequency keeps the SoC hot and triggers the thermal governors. |
+| `settings put global activity_manager_constants` | Accepted and persisted, but never applied - the ROM's observer is disabled. Proven with a control test on a key known to work. |
+| Runtime Resource Overlays | Install rejected on signature mismatch; enable rejected with `idmap2d: failed to parse idmap header`. Root cause: zero `<overlayable>` policies declared in `framework-res.apk` and `SystemUI.apk`. |
+| `setprop dalvik.vm.heapgrowthlimit` | SELinux blocks non-ro properties from the shell UID. |
+| Writing `scaling_max_freq` | Root-only node. **But this turned out to be unnecessary** - see the feedback loop above. |
+
 ## Quick start
 
 ```bash
@@ -188,6 +284,7 @@ perf-lab.sh            apply / reapply / rollback / status
 diagnose.sh            10-section read-only root-cause report
 perf-model.sh          analytic performance model - predicts outcomes
 swap-drain.sh          reclaim swap residency back into RAM
+aot-compile.sh         ahead-of-time compile apps for faster starts
 benchmark.sh           reproducible frame-timing benchmark
 ab-test.sh             A/B the same app tuned vs. untuned
 collect.sh             point-in-time metric snapshot
