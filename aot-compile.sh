@@ -62,7 +62,14 @@ case "${1:-}" in
     echo "=== AOT compiling the apps you use ==="
     for p in $(sh_ "pm list packages -3" | cut -d: -f2); do
       printf '  %-36s ' "$p"
-      sh_ "cmd package compile -m speed -f $p" | tail -1 | cut -c1-40
+      # Some large multi-split apps fail under -m speed but succeed under
+      # -m speed-profile, so fall back to that.
+      out=$(sh_ "cmd package compile -m speed -f $p" | tail -1)
+      case "$out" in
+        *Success*) ;;
+        *) out=$(sh_ "cmd package compile -m speed-profile -f $p" | tail -1) ;;
+      esac
+      echo "$out" | cut -c1-40
     done
     echo
     status

@@ -189,10 +189,15 @@ app**, so the first seconds of every launch go to compiling rather than
 drawing. AOT compilation moves that to a one-off step.
 
 *Effect:* faster cold starts, smoother execution, less CPU burned compiling
-during interaction. 28 packages moved to `status=speed`.
+during interaction.
 *Cost:* disk space and a one-off compile. A full-device compile is ~325
 packages and takes several minutes; `installd` may restart and interrupt
 it, so it is resumable.
+
+**Note on `-m speed` vs `-m speed-profile`:** some large apps with many
+split APKs fail under `-m speed` ("could not be compiled") but succeed under
+`-m speed-profile`. Instagram (147 MB, 9 splits) is one. The script tries
+both.
 
 ### 5. Halve animation duration - animation scales `0.5`
 
