@@ -130,12 +130,52 @@ Verified by rebooting the device and re-checking.
 ```
 perf-lab.sh            apply / reapply / rollback / status
 diagnose.sh            10-section read-only root-cause report
+perf-model.sh          analytic performance model - predicts outcomes
+swap-drain.sh          reclaim swap residency back into RAM
 benchmark.sh           reproducible frame-timing benchmark
 ab-test.sh             A/B the same app tuned vs. untuned
 collect.sh             point-in-time metric snapshot
 profiles/              per-device-family configuration
 data/RESULTS.md        every measured number, plus what did not work
 docs/HARDWARE.md       the test device
+docs/RESEARCH-NOTES.md the reasoning, including the failed paths
+```
+
+### The analytic model
+
+`perf-model.sh` reads the device's real hardware and runtime state and
+computes where the frame budget is going, so a change's expected outcome can
+be predicted *before* applying it:
+
+```
+frame_time = cpu_work + gpu_work + io_wait + sched_latency
+
+  cpu_work     = cycles_needed / clock_available          (Amdahl)
+  gpu_work     = pixels * shader_cost / gpu_throughput
+  io_wait      = pages_to_fetch / io_bandwidth           (Little's Law)
+  sched_latency = (runnable_procs / cores) * timeslice
+
+  throughput ratio vs stock:
+    R = (4*f_big + 4*f_little)_current / (4*f_big + 4*f_little)_stock
+```
+
+On the test device this reports **R = 0.6910 - 30.9% of CPU throughput lost**
+to a vendor frequency cap, and ranks the reachable levers by gain/risk.
+
+### The swap drain
+
+`swap-drain.sh` addresses the `io_wait` term directly. On this ROM the
+kernel migrates cold pages out to zram and never brings them back, because
+the compaction daemon that does the reverse is unavailable. Swap therefore
+stays ~85% full even while RAM looks half-empty, and every cold page the
+renderer touches costs roughly 100x a RAM access.
+
+Stopping the swap-heavy processes releases their zram pages immediately:
+
+```
+swap used   1278 MB (83.3%)  ->  915 MB (59.6%)
+MemAvailable  720 MB          ->  1006 MB
+SystemUI p90 frame time  21ms ->  16ms   (60Hz budget = 16.67ms)
 ```
 
 Device-specific choices live in `profiles/*.profile`, so the tooling is
