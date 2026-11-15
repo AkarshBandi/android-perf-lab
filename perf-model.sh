@@ -67,7 +67,7 @@ echo "    swap             ${SWAP_TOTAL_MB} MB   (in use ${SWAP_USED_MB} MB = ${
 echo "    panel            ${PANEL_W}x${PANEL_H} @ ${FPS} Hz"
 echo "    frame budget     ${BUDGET} ms/frame"
 echo
-echo "[2] CPU CAP ANALYSIS"
+echo "[2] CPU CAP ANALYSIS (cap tracks swap pressure - see swap-drain.sh)"
 echo "    stock peak       $((STOCK_MHZ/1000)) MHz aggregate"
 echo "    current ceiling  $((CAPPED_MHZ/1000)) MHz aggregate"
 echo "    ratio R          $RATIO"

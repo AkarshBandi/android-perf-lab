@@ -263,9 +263,44 @@ zram, every cold page was a ~100x-latency fault, so the kernel and the
 vendor power manager kept the SoC down to reduce the fault rate. Freeing the
 swap removed the pressure, and the cap lifted itself.
 
+**Reproducibility (the decisive evidence).** Draining swap and watching the
+cap move, twice in a row:
+
+```
+before drain:  cpu0max=1305600  cpu4max=1056000  swap=1330 MB
+after  drain:  cpu0max=1804800  cpu4max=1612800  swap=1137 MB
+
+cycle 2: cpu0max=1804800  swap=1063 MB
+cycle 3: cpu0max=1804800  swap=1229 MB
+```
+
+The cap tracks swap pressure directly. Drain enough and it lifts; let swap
+refill and it re-applies. It was never a fixed hardware ceiling.
+
 That reframes the whole problem: the "slow processing power" the user
 described was not a hardware limit - it was the phone protecting itself
 against its own memory thrash.
+
+### The feedback loop
+
+```
+   swap fills up
+        |
+        v
+   cold pages cost ~100x a RAM access
+        |
+        v
+   vendor holds the SoC down to cut the fault rate   (R = 0.69)
+        |
+        v
+   CPU is 31% slower, so pages fault more often
+        |
+        +------------------> back to "swap fills up"
+```
+
+The cap is a *symptom amplifier*. Breaking it at either end works:
+reclaim swap (removes the cause) or keep apps out of the standby kill tier
+(stops the churn). The repo does both.
 
 ---
 
