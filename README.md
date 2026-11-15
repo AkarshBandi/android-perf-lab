@@ -109,7 +109,7 @@ nothing is written to `/system`. Every change is reversible via `rollback`.
 | Vendor supervisors disabled | Removes vivo's second kill layer. 15 packages, each verified non-critical (no IME, launcher, dialer, or biometric component). |
 | `cached_apps_freezer=disabled` | Removes the freeze/thaw stall when resuming an app. |
 | Animation scales `0.5x` | Animations finish in half the time. The single biggest perceived-smoothness win on a 60 Hz panel. |
-| `cmd game downscale 0.7-0.75` | Renders at reduced resolution - roughly 40% less GPU work, near-identical at this panel density. |
+| `cmd game downscale` | Renders at reduced resolution. **Opt-in, off by default** - it reduces GPU work but upscaling to the panel makes text look larger and softer, which on a 720p display reads as "the font size changed". See [docs/RESEARCH-NOTES.md](docs/RESEARCH-NOTES.md) §9. |
 | Doze whitelist | Keeps foreground apps out of deep idle. |
 | `pm uninstall --user 0` | Removes unused packages in a way that **survives reboots**. |
 
@@ -167,8 +167,8 @@ results are the most transferable part of the work:
   `UPDATED_SYSTEM_APP` entries the vendor hardcodes as non-removable. Seven
   separate bypass techniques were tried, including direct binder calls at
   transaction IDs derived from AOSP source for this SDK.
-- **Some settings reset on boot.** `app_standby_enabled` and the downscale
-  ratios are re-applied by `perf-lab.sh reapply`.
+- **Some settings reset on boot.** `app_standby_enabled` is re-applied by
+  `perf-lab.sh reapply`.
 - **One device, one vendor.** The findings are specific to this ROM. The
   *method* generalises; the package lists do not.
 
