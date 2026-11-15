@@ -50,6 +50,8 @@ load_profile
 : "${DOWNSCALE:=}"
 : "${WHITELIST:=}"
 : "${SHIZUKU_BIN:=}"
+: "${APPS_FULL_CAP:=}"
+: "${APPS_SOFT_CAP:=}"
 
 # ------------------------------------------------------------------ actions
 do_reapply() {
@@ -61,6 +63,9 @@ do_reapply() {
   for e in $DOWNSCALE; do
     p="${e%%:*}"; v="${e##*:}"
     run "downscale $p -> $v" "cmd game downscale $v $p"
+  done
+  for p in $APPS_FULL_CAP $APPS_SOFT_CAP; do
+    run "cap $p" "cmd appops set $p RUN_IN_BACKGROUND ignore"
   done
 }
 
@@ -87,7 +92,16 @@ do_apply() {
     run "downscale $p -> $v" "cmd game downscale $v $p"
   done
 
-  echo ">> 6. Shizuku service"
+  echo ">> 6. Background-execution caps"
+  for p in $APPS_FULL_CAP; do
+    run "cap $p (no background services)" "cmd appops set $p RUN_IN_BACKGROUND ignore"
+    run "cap $p (no background work)"      "cmd appops set $p RUN_ANY_IN_BACKGROUND ignore"
+  done
+  for p in $APPS_SOFT_CAP; do
+    run "soft-cap $p (push preserved)" "cmd appops set $p RUN_IN_BACKGROUND ignore"
+  done
+
+  echo ">> 7. Shizuku service"
   [ -n "$SHIZUKU_BIN" ] && run "start shizuku_server" "$SHIZUKU_BIN"
 }
 
@@ -101,6 +115,10 @@ do_rollback() {
   for p in $DISABLE_SYSTEM; do run "enable $p" "pm enable --user 0 $p"; done
   for p in $UNINSTALL_USER; do run "reinstall $p" "cmd package install-existing --user 0 $p"; done
   for e in $DOWNSCALE; do p="${e%%:*}"; run "downscale off $p" "cmd game downscale disable $p"; done
+  for p in $APPS_FULL_CAP $APPS_SOFT_CAP; do
+    run "uncap $p" "cmd appops set $p RUN_IN_BACKGROUND default"
+    run "uncap $p" "cmd appops set $p RUN_ANY_IN_BACKGROUND default"
+  done
 }
 
 do_status() {

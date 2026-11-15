@@ -27,3 +27,30 @@ com.instagram.android com.google.android.gms"
 
 # Shizuku's server binary, shipped inside the Shizuku APK.
 SHIZUKU_BIN="/data/app/~~h6pqdtKdYlBZlljMu9wtPg==/moe.shizuku.privileged.api-oZ2_Sqv-Dr0x3xzA6t6GEA==/lib/arm64/libshizuku.so"
+
+# ---------------------------------------------------------------- appops
+# Background-execution caps.
+#
+# Two levels:
+#
+#   RUN_IN_BACKGROUND + RUN_ANY_IN_BACKGROUND = ignore
+#       The app cannot start background services at all. Appropriate for apps
+#       with no time-sensitive push (browsers, video, Play Store, games).
+#       FCM push still arrives - it is delivered by GMS, not by the app's own
+#       background service.
+#
+#   RUN_IN_BACKGROUND = ignore only
+#       Blocks background services but leaves the broader flag alone. Used for
+#       apps where order/payment alerts matter (grocery, payments, delivery,
+#       banking, messaging) so push delivery is not degraded.
+#
+#   Leave alone: com.google.android.gms (it IS the push transport),
+#   com.android.vending and the launcher.
+APPS_FULL_CAP="com.brave.browser com.google.android.youtube com.google.android.apps.maps \
+com.google.android.apps.tachyon com.android.vending com.google.android.googlequicksearchbox \
+com.google.android.contactkeys com.google.android.safetycore com.google.android.verifier \
+com.supercell.clashroyale org.opengrind app.buddy.assistant com.instagram.android \
+com.truecaller"
+
+APPS_SOFT_CAP="com.grofers.customerapp com.phonepe.app in.swiggy.android \
+com.google.android.apps.nbu.paisa.user com.whatsapp.w4b"
