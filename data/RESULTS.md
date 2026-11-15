@@ -115,8 +115,45 @@ Measured incrementally, not estimated:
 | `app_standby_enabled=0` | Stops Android demoting background apps into the tier the LMKD harvests. A backgrounded app's `oom_score_adj` was observed dropping to 900+; with this set it stays at **0**. |
 | 15 vendor background supervisors disabled | Removes vivo's own second kill layer (`com.vivo.sps` alone held 120 MB and ran at 54% CPU). |
 | `cached_apps_freezer=disabled` | Freezing and thawing cached apps stalls the launcher on resume. Disabling removes the thaw cost. |
-| `cmd game downscale` | Renders at 70-75% resolution instead of native. Visually near-identical at this panel density, roughly 40% less GPU work. |
+| `cmd game downscale` | **Tried and reverted.** Renders at 70-75% resolution instead of native - roughly 40% less GPU work - but upscaling to the panel makes text visibly larger and softer, which on a 720p display reads as "the font size changed". Kept as an opt-in lever, off by default. |
 | 19 unused packages removed | 19 fewer processes and 4 GB less storage. |
+| 18 apps background-capped via appops | Stops apps spawning background services and jobs, which is what keeps swap filling and the CPU capped. |
+
+## AOT compilation
+
+Every third-party app was moved off the JIT path.
+
+| | |
+|---|---:|
+| Third-party apps AOT compiled | **17 of 17** |
+| Packages AOT compiled device-wide | **57** |
+
+`-m speed` gives the fastest startup but the largest output. `-m speed-profile`
+adds a hotness profile, giving better steady-state behaviour for less space.
+Some large multi-split apps fail under `-m speed` and succeed under
+`-m speed-profile` - Instagram (147 MB across 9 splits) is one, so the
+script now falls back automatically.
+
+The compiled output lives in a sibling `oat/` directory next to each APK.
+**The APK itself is byte-identical and the signature is untouched** -
+`base.apk` mtime stayed at the install time while `oat/arm64/*.odex` was
+written alongside it. Nothing is repacked or modified.
+
+## Background-execution caps
+
+18 apps capped via appops:
+
+| Level | Apps |
+|---|---|
+| Full (`RUN_IN_BACKGROUND` + `RUN_ANY_IN_BACKGROUND` = ignore) | brave.browser, youtube, maps, apps.tachyon, vending, googlequicksearchbox, contactkeys, safetycore, verifier, clashroyale, opengrind, buddy.assistant, instagram, truecaller |
+| Soft (`RUN_IN_BACKGROUND` = ignore only) | grofers, phonepe, swiggy, nbu.paisa.user, whatsapp.w4b |
+| **Left alone** | com.google.android.gms (it IS the push transport), com.android.vending, com.bbk.launcher2 |
+
+FCM push is delivered by GMS rather than by each app's own background
+service, so fully-capped apps still receive notifications. The soft cap
+exists for apps that must act on a push immediately.
+
+All 17 apps were verified to still launch after capping.
 
 ## What did NOT work
 

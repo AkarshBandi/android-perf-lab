@@ -190,6 +190,24 @@ and a heavyweight game all reported `WaitTime` within 100 ms of each other
 so the number is an artefact of the command, not a measurement of the app.
 Real launch cost was measured from frame timestamps instead.
 
+**`cmd package resolve-activity -c android.intent.category.LAUNCHER` is
+broken on some vendor ROMs.** On this device it returns "No activity found"
+for *every* package - including ones never touched - and
+`pm query-activities` with the same intent returns zero results too, while
+the app drawer renders perfectly and every app launches when tapped. This
+looks alarming and is a red herring.
+
+To verify an app actually starts, launch it the way the user does:
+
+```bash
+am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p <pkg>
+```
+
+Note that `am start -n <pkg>/<activity>` reports `Error type 3` for a
+force-stopped app - the explicit-component form does not clear the stopped
+state, so it fails even though the app is fine. The intent form above
+works. All 17 third-party apps were verified this way.
+
 **`dumpsys gfxinfo` needs the surface in the foreground.** A reset followed by
 an app launch leaves the stats attached to the *old* process, and the new one
 reports nothing. The surface has to be brought forward first.

@@ -225,6 +225,25 @@ Keeps foreground apps out of deep idle.
 
 *Effect:* 19 fewer processes and 4 GB less storage.
 
+### 9. Cap background execution per app - `appops`
+
+Android lets any app start services, wake receivers and run jobs in the
+background. On a 2.7 GB device that churn is what keeps swap full and the
+CPU capped. Two levels of cap are used:
+
+| Level | Ops | Effect |
+|---|---|---|
+| **Full** | `RUN_IN_BACKGROUND` + `RUN_ANY_IN_BACKGROUND` = `ignore` | The app cannot start background services at all. Used for apps with no time-sensitive push: browsers, video, Maps, Play Store, games, the Google app. |
+| **Soft** | `RUN_IN_BACKGROUND` = `ignore` only | Blocks background services but leaves the broader flag alone, so push delivery is not degraded. Used for apps where order, payment or message alerts matter. |
+
+**FCM push still arrives for fully-capped apps** - it is delivered by
+`com.google.android.gms`, not by the app's own background service. That is
+why `com.google.android.gms` itself is deliberately left uncapped: it *is*
+the push transport, and restricting it would break every notification.
+
+Applied to 18 apps. `com.android.vending` and the launcher are left alone
+so Play Store's background install work and the home screen keep running.
+
 ### Levers that were tried and rejected
 
 | Attempt | Why it was rejected |
