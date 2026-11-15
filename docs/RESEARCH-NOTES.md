@@ -196,7 +196,26 @@ reports nothing. The surface has to be brought forward first.
 
 ---
 
-## 9. What would be worth trying next
+## 9. A change that looked fine on paper and had to be reverted
+
+`cmd game downscale` renders an app at 70-75% of native resolution and
+upscales the result to the panel. It is a genuine GPU-work reduction, and it
+measurably helped frame times.
+
+It was reverted on the user's device anyway. Downscale upscaling makes text
+render at a non-native pixel grid, so labels and small UI elements come out
+**visibly larger and softer** than native rendering. Users read that as "the
+display and font size changed", which is a worse outcome than the frame-rate
+gain - the hardware is already a 720p panel, so there is no headroom to trade
+away.
+
+**Lesson:** on a low-resolution display, resolution is not a resource worth
+trading. It is the one thing the user perceives directly. Kept in the
+tooling as an opt-in, but removed from the applied profile.
+
+---
+
+## 10. What would be worth trying next
 
 - **Root.** The `<overlayable>` gate, the four locked packages, and
   `activity_manager_constants` are all root-blocked. With root, system theming
