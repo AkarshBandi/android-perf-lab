@@ -59,6 +59,8 @@ moving pages back and forth for nothing.
 | **MemAvailable** | 445 MB | **1,062 MB** |
 | **Swap free** | 3.5 MB | **336 MB** |
 | **system_server CPU** | 730% | **2%** |
+| **CPU throughput ratio** | 0.6910 | **1.0000** (100% of rated clock) |
+| **Apps AOT compiled** | 0 | **17 of 17** |
 | Storage free | 14 GB | **19 GB** |
 
 Full numbers, per-mechanism attribution, and the negative results are in
@@ -389,12 +391,20 @@ results are the most transferable part of the work:
   transaction IDs derived from AOSP source for this SDK.
 - **Some settings reset on boot.** `app_standby_enabled` is re-applied by
   `perf-lab.sh reapply`.
+- **The CPU cap returns when swap refills.** This is the central finding -
+  the cap is a *symptom* of memory pressure, not an independent limit. It
+  means `swap-drain.sh` must run periodically, otherwise the 30.9%
+  throughput loss comes back. A boot-time hook or a scheduled job closes
+  this; it is the one piece of the system that is not yet automated.
+- **AOT output is invalidated by an app update.** Instagram updates often,
+  and it falls back to `verify` and re-JITs itself. `aot-compile.sh` is
+  idempotent, so re-running it is the fix.
 - **One device, one vendor.** The findings are specific to this ROM. The
   *method* generalises; the package lists do not.
 
 ## Method notes
 
-Two measurement mistakes were made and corrected during this work, both
+Three measurement mistakes were made and corrected during this work, all
 recorded because they are easy to repeat:
 
 1. **Benchmarks run with the screen off are meaningless.** With the display
@@ -405,6 +415,12 @@ recorded because they are easy to repeat:
    launcher and a game all reported the same time. It is a fixed artefact of
    the command, not an application measurement. Real launch cost was measured
    with frame timestamps instead.
+3. **`scaling_max_freq` may be unreadable, which is not the same as
+   capped.** The node is mode 0660 owned by `system`, so the shell UID
+   cannot read it on some kernels. The model was reporting a false
+   "1804 -> 0 MHz" cap until it was changed to fall back to the observed
+   clock. A core that is not capped demonstrably reaches `cpuinfo_max_freq`
+   under load.
 
 ## License
 
