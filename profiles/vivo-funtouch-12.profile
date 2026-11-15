@@ -12,11 +12,14 @@ com.iqoo.powersaving"
 UNINSTALL_USER="com.vivo.easyshare com.vivo.browser com.vivo.unionpay com.yozo.vivo.office \
 android.autoinstalls.config.vivo.devices"
 
-# Reduced-resolution rendering. cmd game downscale accepts 0.3 - 0.9.
-# 0.70 for games (GPU-bound), 0.75 for general apps (mostly CPU-bound).
-DOWNSCALE="com.supercell.clashroyale:0.7 com.kotobagames.namelesscat:0.7 \
-com.instagram.android:0.75 com.truecaller:0.75 com.whatsapp:0.75 com.brave.browser:0.75 \
-com.google.android.apps.tachyon:0.75 com.grindrapp.android:0.75"
+# Reduced-resolution rendering via `cmd game downscale` (accepts 0.3 - 0.9).
+#
+# DISABLED BY DEFAULT. It does reduce GPU work and improves frame times, but
+# upscaling to the panel renders text on a non-native pixel grid, making
+# labels visibly larger and softer. On a 720p panel that reads as "the font
+# size changed", which is a worse trade than the frame-rate gain.
+# Enable deliberately by setting DOWNSCALE in a local copy of this profile.
+DOWNSCALE=""
 
 # Apps that must survive Doze and the standby demotion.
 WHITELIST="com.whatsapp com.brave.browser com.supercell.clashroyale com.truecaller \
