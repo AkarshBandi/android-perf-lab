@@ -25,8 +25,27 @@ num() { awk -v v="${1:-0}" 'BEGIN{ if (v+0==0) print 0; else print v }'; }
 CORES=$(num "$(sh_ 'grep -c ^processor /proc/cpuinfo')")
 B_MAX=$(num "$(f /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)")
 L_MAX=$(num "$(f /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_max_freq)")
-B_CUR=$(num "$(f /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq)")
-L_CUR=$(num "$(f /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq)")
+# The scaling_max_freq node is mode 0660 owned by system on some kernels, so
+# the shell UID may not be able to read it even though it is not capped.
+# Fall back to the observed clock under the current load, and treat an
+# unreadable value as "not capped" rather than "capped to zero".
+read_max() {
+  local v; v=$(f "$1")
+  if [ -z "$v" ] || [ "$v" = "0" ]; then
+    # Unreadable -> check whether the core actually reaches cpuinfo_max.
+    local ci; ci=$(f "$2")
+    local cur; cur=$(f "$3")
+    if [ -n "$ci" ] && [ -n "$cur" ] && [ "$cur" -ge "$ci" ] 2>/dev/null; then
+      echo "$ci"   # observed at hardware peak -> not capped
+    else
+      echo "$cur"  # genuinely below peak
+    fi
+  else
+    echo "$v"
+  fi
+}
+B_CUR=$(num "$(read_max /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq)")
+L_CUR=$(num "$(read_max /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_max_freq /sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq)")
 GOV=$(f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 MEM_KB=$(num "$(sh_ "grep MemTotal /proc/meminfo" | awk '{print $2}')")
 SWAP_KB=$(num "$(sh_ "grep SwapTotal /proc/meminfo" | awk '{print $2}')")
