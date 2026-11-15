@@ -84,9 +84,15 @@ fi
 
 echo "  >> draining..."
 while read -r kb pid name; do
-  # Never stop the critical framework processes.
+  # Never stop these. Stopping the IME, the launcher or the Play Store
+  # saves swap but costs the user a visible interruption, which is a bad
+  # trade. Only background apps are worth reclaiming from.
   case "$name" in
-    system_server|surfaceflinger|zygote|zygote64|com.android.systemui|com.bbk.launcher2) continue ;;
+    system_server|surfaceflinger|zygote|zygote64) continue ;;
+    com.android.systemui|com.bbk.launcher2) continue ;;
+    com.google.android.inputmethod.latin|com.google.android.inputmethod.*) continue ;;
+    com.android.vending|com.google.android.gms) continue ;;
+    com.vivo.appstore|com.vivo.hiboard|com.vivo.theme|com.bbk.theme) continue ;;
   esac
   # A colon suffix means a secondary process; the package is the part before ':'.
   pkg=${name%%:*}

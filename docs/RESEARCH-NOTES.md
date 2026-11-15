@@ -215,11 +215,66 @@ tooling as an opt-in, but removed from the applied profile.
 
 ---
 
-## 10. What would be worth trying next
+## 10. The CPU frequency cap - and why it was never thermal
+
+The device was capped well below its silicon:
+
+| Cluster | Stock | Observed | Ratio |
+|---|---:|---:|---:|
+| Big (cpu0-3) | 1804 MHz | 1305 MHz | 72.3% |
+| Little (cpu4-7) | 1612 MHz | 1056 MHz | 65.5% |
+| **Aggregate** | **13,670 MHz** | **9,446 MHz** | **69.1%** |
+
+With a 16.67 ms frame budget at 60 Hz, that is a **30.9% throughput loss** - a
+task needing N cycles took 1.45x longer to complete.
+
+**Ruled out, in order:**
+1. *Thermal throttling* - CPU zones read 36-37 C against 115/125 C trip
+   points, `Thermal Status: 0`, and every `thermal-cpufreq-*` cooling device
+   reported `cur_state=0`. The thermal engine was not throttling anything.
+2. *Charging* - `dumpsys battery unplug` did not lift the cap. The
+   `chg-skin-therm-usr` zone did read 79 C, but its trip point is 125 C
+   (passive), so it was below threshold.
+3. *The scheduler* - `scaling_max_freq` was pinned, not merely unused.
+   `scaling_max_freq == scaling_min_freq` on the little cluster, and under a
+   saturating busy-loop the clocks never moved. A governor that merely chose
+   not to boost would still have allowed the hardware to reach 1804 MHz.
+4. *Writes from the shell* - `echo 1804800 > scaling_max_freq` returns
+   `Permission denied`. The node is root-writable only, so the cap could not
+   simply be undone from ADB.
+
+**What it actually was:** a deliberate vendor power tier. The capped values
+(1305600, 1056000) are exact entries in each cluster's frequency table
+(`scaling_available_frequencies`), sitting two steps below the top - the
+signature of a fixed operating point, not a dynamic throttle.
+
+**And it was a symptom, not the disease.** After reclaiming swap residency
+(see below), the ceiling returned to stock on every core, unprompted:
+
+```
+cpu0 max 1305600 -> 1804800
+cpu4 max 1056000 -> 1612800
+R: 0.6910 -> 1.0000
+```
+
+The correlation is the whole point: **the vendor was capping the CPU because
+the system was memory-starved.** With 1.4 GB of the working set resident in
+zram, every cold page was a ~100x-latency fault, so the kernel and the
+vendor power manager kept the SoC down to reduce the fault rate. Freeing the
+swap removed the pressure, and the cap lifted itself.
+
+That reframes the whole problem: the "slow processing power" the user
+described was not a hardware limit - it was the phone protecting itself
+against its own memory thrash.
+
+---
+
+## 11. What would be worth trying next
 
 - **Root.** The `<overlayable>` gate, the four locked packages, and
   `activity_manager_constants` are all root-blocked. With root, system theming
-  and real compaction become available.
+  and real compaction become available. Note that the CPU frequency cap does
+  **not** need root - it lifts itself once memory pressure is gone.
 - **A second device on a different vendor.** The methodology generalises; the
   package lists do not. vivo's ROM differs from stock AOSP in several
   measurable ways.

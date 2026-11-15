@@ -79,6 +79,40 @@ observation is what redirected the entire investigation away from "make the
 GPU faster" - which on an Adreno 610 would have been hopeless - and toward
 memory pressure, which was fixable.
 
+## The CPU was capped too - and it was a symptom
+
+While profiling, the SoC turned out to be running **30.9% below its rated
+throughput**:
+
+| Cluster | Stock | Observed | Ratio |
+|---|---:|---:|---:|
+| Big (cpu0-3) | 1804 MHz | 1305 MHz | 72.3% |
+| Little (cpu4-7) | 1612 MHz | 1056 MHz | 65.5% |
+| **Aggregate** | **13,670 MHz** | **9,446 MHz** | **69.1%** |
+
+It was **not** thermal throttling - CPU zones read 36-37 C against 115/125 C
+trip points, every thermal cooling device reported `cur_state=0`, and
+`Thermal Status: 0`. It was not the charger either.
+
+The capped values are exact entries in each cluster's frequency table, two
+steps below the top: a fixed vendor operating point, not a dynamic throttle.
+And it could not be undone from the shell - `scaling_max_freq` is
+root-writable only.
+
+**It was a symptom.** Once swap residency was reclaimed, the ceiling returned
+to stock on every core, unprompted:
+
+```
+cpu0 max 1305600 -> 1804800
+cpu4 max 1056000 -> 1612800
+R (throughput ratio)  0.6910 -> 1.0000
+```
+
+With 1.4 GB of the working set living in zram, every cold page was a
+~100x-latency fault. The vendor was holding the SoC down to reduce the
+fault rate. **The "slow processing power" was the phone protecting itself
+against its own memory thrash** - which is why fixing memory fixed the CPU.
+
 ## Quick start
 
 ```bash
@@ -173,10 +207,13 @@ renderer touches costs roughly 100x a RAM access.
 Stopping the swap-heavy processes releases their zram pages immediately:
 
 ```
-swap used   1278 MB (83.3%)  ->  915 MB (59.6%)
+swap used    1278 MB (83.3%)  ->  915 MB (59.6%)
 MemAvailable  720 MB          ->  1006 MB
 SystemUI p90 frame time  21ms ->  16ms   (60Hz budget = 16.67ms)
 ```
+
+Draining swap is also what lifts the CPU frequency cap. Both effects share
+one cause: memory pressure.
 
 Device-specific choices live in `profiles/*.profile`, so the tooling is
 reusable rather than hardcoded to one handset.
